@@ -1,0 +1,292 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+source("functionsR.R")
+```
+
+
+
+
+
+```{r paged.print=TRUE}
+#get the data
+orgs <- 
+  orgs_tbl %>%  
+  select(id, subscription_price, subscription_state, created_at) %>% 
+  collect() %>%  
+  (organization_id = id)
+
+projects <- project_tbl %>% select(id, created_at, organization_id, is_public, owner_id, tasks_count) %>% collect() %>%  rename(project_id = id)
+
+tasks <- tasks_tbl %>% select(id, project_id, created_at) %>% collect() %>% rename(task_id = id) 
+
+members <- members_tbl %>% select(user_id, organization_id, role, is_member) %>%  collect()
+
+
+
+```
+
+
+```{r}
+
+
+#join the data
+
+all_data <-
+  orgs %>% 
+  rename(org_created = created_at) %>% 
+  left_join(projects) %>% 
+  filter(subscription_state == "active" & subscription_price > 5) %>% 
+  left_join(tasks)
+  
+
+tasks %>% 
+  filter(created_at > 2020-01-01)
+
+member_data <-
+  orgs %>% 
+  filter(subscription_state == "active" & subscription_price > 5) %>%
+  rename(org_created = created_at) %>% 
+  left_join(members) #%>% 
+  #left_join(projects) %>% 
+#  left_join(tasks)
+
+orgs_members <- orgs %>% 
+  left_join(members) %>% 
+  price_fun() %>% 
+  filter(subscription_state =="active" & subscription_price >5) %>% 
+  filter(role >= 3 & !is.na(role))
+ 
+orgs_members %>% 
+  count(subscription_price, organization_id) %>%
+  group_by(subscription_price) %>% 
+  dplyr::summarize(organization_unq = n_distinct(organization_id), members_mean = round(mean(n, na.rm=TRUE), 1), lower_qt = quantile(n, probs = 0.25), upper_qt = quantile(n, probs = 0.75)) 
+
+
+orgs_members %>% 
+  count(subscription_price,organization_id) %>% 
+  ggplot(aes(as.factor(subscription_price), n)) +
+  geom_boxplot() +
+  geom_jitter(alpha = 0.2) + 
+  theme_ipsum_ps()
+  
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+```{r}
+
+
+
+
+
+orgs_guests <- orgs %>% 
+  left_join(members) %>% 
+  price_fun() %>% 
+  filter(subscription_state =="active" & subscription_price >5) %>% 
+  filter(role < 3 & !is.na(role)) %>% 
+  
+  
+orgs_guests %>%   
+  count(subscription_price, organization_id) %>%
+  group_by(subscription_price) %>% 
+  dplyr::summarize(organization_unq = n_distinct(organization_id), guests_mean = round(mean(n, na.rm=TRUE), 1), lower_qt = quantile(n, probs = 0.25), upper_qt = quantile(n, probs = 0.75))
+
+
+orgs_guests %>% 
+  count(subscription_price,organization_id) %>% 
+  ggplot(aes(as.factor(subscription_price), n)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(alpha = 0.2, width = 0.25, colour = "Blue") + 
+  theme_ipsum_rc() +
+  #scale_colour_brewer( direction = -1) +
+  coord_cartesian(ylim = c(0, 150)) +
+  labs(
+  title = "Number of guests by subscription",
+  subtitle = "Increasing up to $189",
+  caption = waiver(),
+  tag = waiver()
+  ) +
+  xlab("subscription price") +
+  ylab("number of guests") +
+  theme(legend.position = "none")
+  
+  
+  
+
+
+
+```
+
+
+```{r}
+
+
+#####projects
+
+projects <- projects %>%  rename(proj_created = created_at)
+
+orgs_projects <- 
+  orgs %>% 
+  left_join(projects) %>% 
+  price_fun() %>% 
+  filter(subscription_state =="active" & subscription_price >5) 
+
+
+orgs_projects%>% 
+  count(subscription_price, organization_id) %>%
+  group_by(subscription_price) %>% 
+  dplyr::summarize(organization_unq = n_distinct(organization_id), proj_mean = round(mean(n, na.rm=TRUE), 1), lower_qt = quantile(n, probs = 0.25), upper_qt = quantile(n, probs = 0.75))
+
+
+orgs_projects %>% 
+  count(subscription_price,organization_id) %>% 
+  ggplot(aes(as.factor(subscription_price), n)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(alpha = 0.2, width = 0.25, colour = "Blue") + 
+  theme_ipsum_rc() +
+  #scale_colour_brewer( direction = -1) +
+  coord_cartesian(ylim = c(0, 100)) +
+  labs(
+  title = "Number of Projects by subscription",
+  subtitle = "wider distribution on higher value plans",
+  caption = waiver(),
+  tag = waiver()
+  ) +
+  xlab("subscription price") +
+  ylab("number of guests") +
+  theme(legend.position = "none")
+
+
+```
+
+
+
+
+```{r}
+
+orgs_projects_tasks <- 
+  orgs %>%
+  filter(subscription_state =="active" & subscription_price >5) %>% 
+  left_join(projects) %>% 
+  rename(org_created = created_at) %>% 
+  left_join(tasks)
+
+orgs_projects_tasks %>%
+  
+
+
+
+```
+
+
+
+
+
+
+
+```{r}
+
+#do some magic
+
+project_count <-
+  all_data %>% 
+  group_by(organization_id) %>%
+  distinct(project_id) %>% 
+  count() %>% 
+  rename(project_count = n)
+  
+
+task_count <-
+  all_data %>% 
+  group_by(organization_id) %>%
+  count() %>% 
+  rename(task_count = n)
+
+count_all <- project_count %>% 
+  left_join(task_count) 
+
+
+
+count_all <-
+  orgs %>% 
+  filter(subscription_state == "active" & subscription_price > 5) %>% 
+  left_join(count_all)
+
+
+count_all %>% 
+  price_fun() %>% 
+  tabyl(subscription_price) %>% 
+  adorn_pct_formatting
+
+
+```
+
+```{r}
+
+count_all %>% 
+  price_fun() %>% 
+  ggplot(aes(x = as.factor(subscription_price), y = task_count, colour = plan_type)) +
+  geom_boxplot(alpha = 0.5, colour = "black") +
+  #geom_point(alpha = 0.5) +
+  geom_jitter(alpha = 0.5) +
+  theme_ipsum() +
+  scale_fill_brewer(palette = "Blues") +
+ # coord_cartesian(ylim=c(0,100)) +
+  scale_x_discrete()
+
+
+
+
+
+
+```
+
+
+```{r}
+
+new_task_count <- tasks %>% left_join(projects) %>% select(organization_id, created_at) %>%  rename(task_created = created_at) %>% group_by(organization_id) %>% count()
+  
+
+
+orgs %>% 
+  rename(org_created = created_at) %>%  
+  left_join(new_task_count) %>% 
+  rename(tasks = n) %>% 
+  mutate(converted = if_else(subscription_price >= 0, TRUE, FALSE)) %>% 
+  group_by(week(org_created), converted) %>% 
+  count() %>% 
+  pivot_wider(names_from = 1, values_from = 2:3)
+  
+  
+
+```
+
+```{r}
+
+library(readr)
+
+members %>% write_csv("members.csv")
+
+orgs %>% write_csv("orgs.csv")
+
+projects %>% write_csv("projects.csv")
+
+tasks %>% write_csv("tasks.csv")
+
+```
+
